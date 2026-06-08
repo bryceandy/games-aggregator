@@ -1,0 +1,83 @@
+name: Code Quality
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+
+# Cancel superseded runs on the same ref to save minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # for PR comments / decoration
+      checks: write          # for check annotations
+      security-events: write # for Semgrep SARIF upload to the Security tab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Sonar needs full history for accurate new-code / blame analysis
+          fetch-depth: 0
+
+      - name: Set up JDK 26
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: maven   # caches ~/.m2 keyed on pom.xml
+
+      # 1) Format check — fails fast if code isn't formatted (see pom.xml config)
+      - name: Spotless check
+        run: mvn -B spotless:check
+
+      # 2) Build + tests + coverage (JaCoCo report produced via pom.xml config)
+      - name: Build and test
+        run: mvn -B verify
+
+      # 3) SonarCloud analysis (quality gate, coverage, code smells, PR decoration)
+      #    Requires SONAR_TOKEN secret. Sonar reads JaCoCo XML from target/.
+      - name: SonarCloud scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B sonar:sonar
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.organization=SONAR_ORG
+          -Dsonar.projectKey=PROJECT_KEY
+
+  semgrep:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Runs the default + java + spring rulesets. Outputs SARIF for the
+      # GitHub Security tab. SEMGREP_APP_TOKEN is optional (only for Semgrep
+      # Cloud dashboard); the CLI rulesets below work without an account.
+      - name: Semgrep scan
+        run: semgrep ci --sarif --output=semgrep.sarif || true
+        env:
+          SEMGREP_RULES: >-
+            p/default
+            p/java
+            p/spring
+            p/secrets
+            p/owasp-top-ten
+
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif

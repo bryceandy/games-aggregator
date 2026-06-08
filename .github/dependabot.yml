@@ -1,0 +1,27 @@
+# GitHub-native dependency updates + security alerts.
+# (Enable "Dependabot alerts" and "Dependabot security updates" under
+#  repo Settings -> Code security. Those need no file and are the CVE scanner.)
+
+version: 2
+updates:
+  # Maven dependencies
+  - package-ecosystem: maven
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Batch minor/patch bumps into one PR to cut noise
+      spring:
+        patterns:
+          - "org.springframework*"
+          - "io.spring*"
+        update-types:
+          - minor
+          - patch
+
+  # Keep the GitHub Actions themselves up to date
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
