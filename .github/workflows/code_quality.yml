@@ -20,7 +20,7 @@ jobs:
       security-events: write # for Semgrep SARIF upload to the Security tab
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Sonar needs full history for accurate new-code / blame analysis
           fetch-depth: 0
@@ -61,7 +61,7 @@ jobs:
       image: semgrep/semgrep
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Runs the default + java + spring rulesets. Outputs SARIF for the
       # GitHub Security tab. SEMGREP_APP_TOKEN is optional (only for Semgrep
